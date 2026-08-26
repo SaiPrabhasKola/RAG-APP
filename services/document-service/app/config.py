@@ -8,6 +8,6 @@ class Settings(BaseSettings):
     minio_secret_key: str = "ragpassword"
     minio_bucket:str = "documents"
 
-    rabbitmq_url:str = "amqp://rag:rag@localhost:5762/"
+    rabbitmq_url:str = "amqp://rag:rag@localhost:5672/"
 
 settings = Settings()
