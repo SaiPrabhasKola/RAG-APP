@@ -1,0 +1,27 @@
+{
+    "folders": [
+        {
+            "name": "Root (RAG-APP)",
+            "path": "."
+        },
+        {
+            "name": "Document Service",
+            "path": "services/document-service"
+        },
+        {
+            "name": "Document Process Worker",
+            "path": "services/document-process-worker"
+        }
+    ],
+    "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder:Document Service}/.venv/Scripts/python.exe",
+        "python.analysis.extraPaths": [
+            "${workspaceFolder:Document Service}"
+        ],
+        "python.autoComplete.extraPaths": [
+            "${workspaceFolder:Document Service}"
+        ],
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.indexing": true
+    }
+}
