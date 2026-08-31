@@ -1,0 +1,24 @@
+{
+    "folders": [
+        {
+            "name": "Root (RAG-APP)",
+            "path": "."
+        },
+        {
+            "name": "Document Service",
+            "path": "services/document-service"
+        },
+        {
+            "name": "Document Process Worker",
+            "path": "services/document-process-worker"
+        },
+        {
+            "name": "Embedding Service",
+            "path": "services/embedding-service"
+        }
+    ],
+    "settings": {
+        "python.analysis.autoImportCompletions": true,
+        "python.analysis.indexing": true
+    }
+}

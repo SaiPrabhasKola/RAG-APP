@@ -6,10 +6,12 @@ from pydantic import condecimal
 
 from app.database import Base, engine, get_db
 from app.models import Document
+from app.publisher import publish_document_job
 
 from sqlalchemy.orm import Session
 
 from app.storage import upload_document
+
 Base.metadata.create_all(bind=engine)
 
 
@@ -67,6 +69,10 @@ def create_document(file: UploadFile = File(...),db: Session =  Depends(get_db))
 
     db.refresh(document)
 
+    publish_document_job(
+        document_id=str(document_id),
+        object_key=document.storage_key
+    )
     return {
         "doc_id" : str(document_id),
         "status": document.status

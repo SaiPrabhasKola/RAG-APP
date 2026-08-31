@@ -1,11 +1,5 @@
 {
-    "python.defaultInterpreterPath": "${workspaceFolder}/services/document-service/.venv/Scripts/python.exe",
-    "python.analysis.extraPaths": [
-        "${workspaceFolder}/services/document-service"
-    ],
-    "python.autoComplete.extraPaths": [
-        "${workspaceFolder}/services/document-service"
-    ],
     "python.analysis.autoImportCompletions": true,
-    "python.analysis.indexing": true
+    "python.analysis.indexing": true,
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }
