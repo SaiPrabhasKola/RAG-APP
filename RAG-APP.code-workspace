@@ -11,16 +11,13 @@
         {
             "name": "Document Process Worker",
             "path": "services/document-process-worker"
+        },
+        {
+            "name": "Embedding Service",
+            "path": "services/embedding-service"
         }
     ],
     "settings": {
-        "python.defaultInterpreterPath": "${workspaceFolder:Document Service}/.venv/Scripts/python.exe",
-        "python.analysis.extraPaths": [
-            "${workspaceFolder:Document Service}"
-        ],
-        "python.autoComplete.extraPaths": [
-            "${workspaceFolder:Document Service}"
-        ],
         "python.analysis.autoImportCompletions": true,
         "python.analysis.indexing": true
     }

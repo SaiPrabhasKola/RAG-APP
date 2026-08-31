@@ -1,0 +1,4 @@
+pika
+pydantic-settings
+sentence-transformers
+qdrant-client
