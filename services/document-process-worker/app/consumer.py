@@ -17,21 +17,47 @@ def process_message(channel, method, props, body):
     print(f"received doc: {document_id}")
     print(f"received obj: {object_key}")
 
+    # -------------------------
+    # Download PDF
+    # -------------------------
     pdf_data = get_pdf(object_key)
 
+    # -------------------------
+    # Extract + normalize text
+    # -------------------------
     pages = extract_text(pdf_data)
 
+    # -------------------------
+    # Structure-aware chunking
+    # -------------------------
     chunks = chunk_pages(pages)
 
-    print(f"created {len(chunks)} chunks")
+    # -------------------------
+    # Debug chunks
+    # -------------------------
+    for chunk in chunks:
+        print("\n--- CHUNK ---")
+        print("Page:", chunk["page_number"])
+        print("Index:", chunk["chunk_index"])
+        print("Section:", chunk["section"])
+        print("Subsection:", chunk["subsection"])
+        print("Text:", chunk["text"])
 
-    for chunk_index, chunk in enumerate(chunks, start=1):
+    print(f"\ncreated {len(chunks)} chunks")
+
+    # -------------------------
+    # Publish chunks to
+    # Embedding Service
+    # -------------------------
+    for chunk in chunks:
 
         embedding_message = {
             "document_id": document_id,
             "page_number": chunk["page_number"],
-            "chunk_index": chunk_index,
-            "text": chunk["text"]
+            "chunk_index": chunk["chunk_index"],
+            "section": chunk["section"],
+            "subsection": chunk["subsection"],
+            "text": chunk["text"],
         }
 
         channel.basic_publish(
@@ -40,15 +66,19 @@ def process_message(channel, method, props, body):
             body=json.dumps(embedding_message),
             properties=pika.BasicProperties(
                 delivery_mode=2
-            )
+            ),
         )
 
         print(
-            f"sent chunk {chunk_index} "
+            f"sent chunk {chunk['chunk_index']} "
             f"from page {chunk['page_number']} "
             f"to embedding queue"
         )
 
+    # -------------------------
+    # Acknowledge original
+    # document.process message
+    # -------------------------
     channel.basic_ack(
         delivery_tag=method.delivery_tag
     )
@@ -61,6 +91,9 @@ def start_consumer():
 
     channel = connection.channel()
 
+    # -------------------------
+    # Declare queues
+    # -------------------------
     channel.queue_declare(
         queue="document.process",
         durable=True
@@ -71,6 +104,9 @@ def start_consumer():
         durable=True
     )
 
+    # -------------------------
+    # Consume processed documents
+    # -------------------------
     channel.basic_consume(
         queue="document.process",
         on_message_callback=process_message,
