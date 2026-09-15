@@ -15,6 +15,14 @@
         {
             "name": "Embedding Service",
             "path": "services/embedding-service"
+        },
+        {
+            "name": "Retrieval Service",
+            "path": "services/retrieval-service"
+        },
+        {
+            "name": "Generation Service",
+            "path": "services/generation-service"
         }
     ],
     "settings": {
