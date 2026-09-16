@@ -16,6 +16,13 @@ venv/
 .coverage
 htmlcov/
 
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db

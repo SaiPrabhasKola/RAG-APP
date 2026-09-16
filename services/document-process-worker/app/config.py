@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "ragadmin"
     minio_secret_key: str = "ragpassword"
     minio_bucket: str = "documents"
+    document_service_url: str = "http://localhost:8000"
 
 
 settings = Settings()

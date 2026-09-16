@@ -18,3 +18,11 @@ class RetrievalResult(BaseModel):
 
 class RetrievalResponse(BaseModel):
     results: list[RetrievalResult]
+
+
+class ChunkCountRequest(BaseModel):
+    document_ids: list[str]
+
+
+class ChunkCountResponse(BaseModel):
+    counts: dict[str, int]

@@ -12,6 +12,8 @@ client = QdrantClient(
 
 COLLECTION_NAME = "document_chunks"
 
+MAX_COUNT_IDS = 100
+
 
 def retrieve(
     query: str,
@@ -57,3 +59,29 @@ def retrieve(
         candidate_chunks,
         top_k=top_k
     )
+
+
+def count_chunks(document_ids: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+
+    for document_id in document_ids[:MAX_COUNT_IDS]:
+        try:
+            counts[document_id] = client.count(
+                collection_name=COLLECTION_NAME,
+                count_filter=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id",
+                            match=MatchValue(value=document_id)
+                        )
+                    ]
+                ),
+                exact=True
+            ).count
+        except Exception as exc:
+            # Report 0 rather than failing the whole request: 0 means
+            # "not known to be searchable", which is the safe default.
+            print(f"chunk count failed for {document_id}: {exc}")
+            counts[document_id] = 0
+
+    return counts

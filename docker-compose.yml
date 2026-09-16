@@ -1,4 +1,5 @@
 services:
+
   postgres:
     image: postgres:17
     container_name: rag-postgres
@@ -10,7 +11,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rag -d rag_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:4-management
     container_name: rag-rabbitmq
@@ -20,13 +26,13 @@ services:
     environment:
       - RABBITMQ_DEFAULT_USER=rag
       - RABBITMQ_DEFAULT_PASS=rag
-  
+
   redis:
     image: redis:8
     container_name: rag-redis
     ports:
       - "6379:6379"
-    
+
   qdrant:
     image: qdrant/qdrant:latest
     container_name: rag-qdrant
@@ -34,7 +40,7 @@ services:
       - "6333:6333"
     volumes:
       - qdrant_data:/qdrant/storage
-    
+
   minio:
     image: minio/minio:latest
     container_name: rag-minio
@@ -42,12 +48,114 @@ services:
     environment:
       - MINIO_ROOT_USER=ragadmin
       - MINIO_ROOT_PASSWORD=ragpassword
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
 
+  document-service:
+    build:
+      context: ./services/document-service
+    container_name: rag-document-service
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://rag:rag@postgres:5432/rag_db
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ragadmin
+      MINIO_SECRET_KEY: ragpassword
+      MINIO_BUCKET: documents
+      RABBITMQ_URL: amqp://rag:rag@rabbitmq:5672/
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:4173"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_started
+  
+  document-process-worker:
+    build:
+      context: ./services/document-process-worker
+    container_name: rag-document-process-worker
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ragadmin
+      MINIO_SECRET_KEY: ragpassword
+      MINIO_BUCKET: documents
+      RABBITMQ_URL: amqp://rag:rag@rabbitmq:5672/
+      DOCUMENT_SERVICE_URL: http://document-service:8000
+    depends_on:
+      document-service:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+      minio:
+        condition: service_started
+  embedding-service:
+    build:
+      context: ./services/embedding-service
+    container_name: rag-embedding-service
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+      RABBITMQ_URL: amqp://rag:rag@rabbitmq:5672/
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      rabbitmq:
+        condition: service_started
+      qdrant:
+        condition: service_started
+
+  retrieval-service:
+    build:
+      context: ./services/retrieval-service
+    container_name: rag-retrieval-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      QDRANT_URL: http://qdrant:6333
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:4173"
+    depends_on:
+      qdrant:
+        condition: service_started
+
+  generation-service:
+    build:
+      context: ./services/generation-service
+    container_name: rag-generation-service
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    env_file:
+      - ./services/generation-service/.env
+    environment:
+      PYTHONUNBUFFERED: "1"
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:4173"
+
+  query-service:
+    build:
+      context: ./services/query-service
+    container_name: rag-query-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      RETRIEVAL_SERVICE_URL: http://retrieval-service:8002
+      GENERATION_SERVICE_URL: http://generation-service:8004
+      REDIS_URL: redis://redis:6379
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost:4173"
+    depends_on:
+      redis:
+        condition: service_started
+      retrieval-service:
+        condition: service_started
+      generation-service:
+        condition: service_started
 volumes:
   postgres_data:
   qdrant_data:

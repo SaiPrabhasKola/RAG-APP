@@ -44,3 +44,9 @@ def upload_document(
         part_size=10 * 1024 * 1024,
         content_type=content_type,
     )
+
+def delete_document(object_name: str):
+    client.remove_object(
+        bucket_name=settings.minio_bucket,
+        object_name=object_name,
+    )

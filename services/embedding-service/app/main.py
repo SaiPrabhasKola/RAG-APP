@@ -7,7 +7,6 @@ from app.config import settings
 from app.embedd import embed_document
 from app.qdrant import ensure_collection, upsert_chunk
 
-
 def process_message(channel, method, properties, body):
     message = json.loads(body)
 
@@ -18,10 +17,7 @@ def process_message(channel, method, properties, body):
     subsection = message.get("subsection")
     text = message["text"]
 
-    print(
-        f"Received chunk {chunk_index} "
-        f"from document {document_id}"
-    )
+    print(f"Received chunk {chunk_index} from document {document_id}")
 
     vector = embed_document(text)
 
@@ -41,21 +37,17 @@ def process_message(channel, method, properties, body):
         "text": text,
     }
 
-    upsert_chunk(
-        point_id=point_id,
-        vector=vector,
-        payload=payload,
-    )
-
-    print(
-        f"Stored chunk {chunk_index} "
-        f"in Qdrant ({len(vector)}D)"
-    )
-
-    channel.basic_ack(
-        delivery_tag=method.delivery_tag
-    )
-
+    try:
+        upsert_chunk(
+            point_id=point_id,
+            vector=vector,
+            payload=payload,
+        )
+        channel.basic_ack(delivery_tag=method.delivery_tag)
+        print(f"chunk upserted: {point_id} ({len(vector)}D)")
+    except Exception as exc:
+        print(f"chunk upsert failed: {exc}")
+        channel.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 def start_consumer():
     connection = pika.BlockingConnection(

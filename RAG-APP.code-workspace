@@ -23,6 +23,14 @@
         {
             "name": "Generation Service",
             "path": "services/generation-service"
+        },
+        {
+            "name": "Query Service",
+            "path": "services/query-service"
+        },
+        {
+            "name": "Evaluation",
+            "path": "Evaluation"
         }
     ],
     "settings": {

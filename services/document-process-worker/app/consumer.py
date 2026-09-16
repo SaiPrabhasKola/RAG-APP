@@ -1,93 +1,109 @@
 import json
+import time
 
 import pika
 
+import traceback
+
 from app.config import settings
+from app.reporter import report_status
 from app.storage import get_pdf
 from app.extractor import extract_text
 from app.chunker import chunk_pages
 
+CONNECT_ATTEMPTS = 10
+CONNECT_RETRY_DELAY = 3.0
+
+
+def _reason(exc):
+    inner = exc.args[0] if exc.args else exc
+    return getattr(inner, "exception", None) or inner
+
+
+def connect(parameters, attempts=CONNECT_ATTEMPTS, delay=CONNECT_RETRY_DELAY):
+    for attempt in range(1, attempts + 1):
+        try:
+            return pika.BlockingConnection(parameters)
+        except pika.exceptions.AMQPConnectionError as exc:
+            if attempt == attempts:
+                raise
+            print(
+                f"rabbitmq connection failed (attempt {attempt}/{attempts}): "
+                f"{_reason(exc)} - retrying in {delay}s"
+            )
+            time.sleep(delay)
+
 
 def process_message(channel, method, props, body):
-    message = json.loads(body)
+    document_id = None
 
-    document_id = message["document_id"]
-    object_key = message["object_key"]
+    try:
+        message = json.loads(body)
 
-    print(f"received doc: {document_id}")
-    print(f"received obj: {object_key}")
+        document_id = message["document_id"]
+        object_key = message["object_key"]
 
-    # -------------------------
-    # Download PDF
-    # -------------------------
-    pdf_data = get_pdf(object_key)
+        print(f"received doc: {document_id}")
+        print(f"received obj: {object_key}")
 
-    # -------------------------
-    # Extract + normalize text
-    # -------------------------
-    pages = extract_text(pdf_data)
+        report_status(document_id, "processing")
 
-    # -------------------------
-    # Structure-aware chunking
-    # -------------------------
-    chunks = chunk_pages(pages)
+        pdf_data = get_pdf(object_key)
 
-    # -------------------------
-    # Debug chunks
-    # -------------------------
-    for chunk in chunks:
-        print("\n--- CHUNK ---")
-        print("Page:", chunk["page_number"])
-        print("Index:", chunk["chunk_index"])
-        print("Section:", chunk["section"])
-        print("Subsection:", chunk["subsection"])
-        print("Text:", chunk["text"])
+        pages = extract_text(pdf_data)
 
-    print(f"\ncreated {len(chunks)} chunks")
+        chunks = chunk_pages(pages)
 
-    # -------------------------
-    # Publish chunks to
-    # Embedding Service
-    # -------------------------
-    for chunk in chunks:
+        print(f"\ncreated {len(chunks)} chunks")
 
-        embedding_message = {
-            "document_id": document_id,
-            "page_number": chunk["page_number"],
-            "chunk_index": chunk["chunk_index"],
-            "section": chunk["section"],
-            "subsection": chunk["subsection"],
-            "text": chunk["text"],
-        }
+        for chunk in chunks:
 
-        channel.basic_publish(
-            exchange="",
-            routing_key="document.embed",
-            body=json.dumps(embedding_message),
-            properties=pika.BasicProperties(
-                delivery_mode=2
-            ),
+            embedding_message = {
+                "document_id": document_id,
+                "page_number": chunk["page_number"],
+                "chunk_index": chunk["chunk_index"],
+                "section": chunk["section"],
+                "subsection": chunk["subsection"],
+                "text": chunk["text"],
+            }
+
+            channel.basic_publish(
+                exchange="",
+                routing_key="document.embed",
+                body=json.dumps(embedding_message),
+                properties=pika.BasicProperties(
+                    delivery_mode=2
+                )
+            )
+
+        if not chunks:
+            # Terminal: nothing to embed, so this document will never be
+            # searchable. Report it rather than leaving it "processing".
+            report_status(document_id, "empty")
+
+        channel.basic_ack(
+            delivery_tag=method.delivery_tag
         )
 
-        print(
-            f"sent chunk {chunk['chunk_index']} "
-            f"from page {chunk['page_number']} "
-            f"to embedding queue"
-        )
+        print(f"document processed successfully: {document_id}")
 
-    # -------------------------
-    # Acknowledge original
-    # document.process message
-    # -------------------------
-    channel.basic_ack(
-        delivery_tag=method.delivery_tag
-    )
+    except Exception as exc:
+        print(f"document processing failed: {exc}")
+        traceback.print_exc()
+
+        if document_id:
+            report_status(document_id, "failed")
+
+        channel.basic_nack(
+            delivery_tag=method.delivery_tag,
+            requeue=True
+        )
 
 
 def start_consumer():
-    connection = pika.BlockingConnection(
-        pika.URLParameters(settings.rabbitmq_url)
-    )
+    parameters = pika.URLParameters(settings.rabbitmq_url)
+
+    connection = connect(parameters)
 
     channel = connection.channel()
 
