@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 class Source(BaseModel):
+    id:int
     document_id: str
     page_number:int
     chunk_index:int

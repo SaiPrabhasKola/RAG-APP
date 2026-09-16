@@ -4,7 +4,8 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from app.config import settings
 
 client = QdrantClient(
-    url=settings.qdrant_url
+    url=settings.qdrant_url,
+    timeout=30
 )
 
 COLLECTION_NAME = "document_chunks"
